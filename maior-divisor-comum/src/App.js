@@ -10,11 +10,11 @@ const App = () => {
   const [resultado, setResultado] = useState(0);
 
   const handleValor1Change = (event) => {
-    setValor1(event.target.value);
+    setValor1(Number(event.target.value));
   };
 
   const handleValor2Change = (event) => {
-    setValor2(event.target.value);
+    setValor2(Number(event.target.value));
   };
 
   const handleBotaoClick = () => {
