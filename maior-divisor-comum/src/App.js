@@ -1,61 +1,121 @@
-import React, { useState } from "react";
-import MeuWorker from "./worker/mdcCalculator";
+import React, { useEffect, useMemo, useState } from "react";
 
-import logo from "./logo.svg";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 import "./App.css";
 import { Input } from "./components/input/input";
 import { Button } from "./components/button/button";
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const worker = new Worker("worker.js");
+const workerProcessamento = new Worker("worker-processamento.js");
+
+const VALOR_CALCULO = 1_000_000;
+
 const App = () => {
-  const [valor1, setValor1] = useState(0);
-  const [valor2, setValor2] = useState(0);
-  const [resultado, setResultado] = useState(0);
+  const [contagem, setContagem] = useState(0);
+  const [valorContagem, setValorContagem] = useState(0);
+  const [contagemBloqueante, setContagemBloqueante] = useState(0);
+  const [valorContagemBloqueante, setValorContagemBloqueante] = useState(0);
 
-  const handleValor1Change = ({ target: { value } }) => {
-    if (isNaN(value)) return;
-    setValor1(Number(value));
+  useEffect(() => {
+    worker.addEventListener("message", handleMessage);
+    workerProcessamento.addEventListener("message", handleMessage);
+  }, []);
+
+  const handleMessage = (event) => {
+    const { data } = event;
+
+    if (data === "fim-processamento") {
+      toast.error("Fim do processamento no Worker", {
+        hideProgressBar: true,
+      });
+    }
+
+    if (data.tipo === "contagem") return setValorContagem(data.contagem);
   };
 
-  const handleValor2Change = ({ target: { value } }) => {
+  const handleValor3Change = ({ target: { value } }) => {
     if (isNaN(value)) return;
-    setValor2(Number(value));
+    setContagem(Number(value));
   };
 
-  const handleBotaoClick = () => {
-    console.log("Executando...");
+  const changeValorBloqueante = ({ target: { value } }) => {
+    if (isNaN(value)) return;
+    setContagemBloqueante(Number(value));
+  };
 
-    const worker = new MeuWorker();
+  const naoBloqueante = () => {
+    toast.error("Iniciando Processamento pesado", {
+      hideProgressBar: true,
+    });
+    worker.postMessage(contagem);
+    workerProcessamento.postMessage(VALOR_CALCULO);
+  };
 
-    const handleMessage = (event) => {
-      const resultado = event.data;
+  const contagemBloqueanteFn = async (num) => {
+    const contagemRegressiva = async (num) => {
+      let contagem = num;
 
-      setResultado(resultado);
-
-      worker.terminate();
+      while (contagem > 0) {
+        await sleep(1000);
+        contagem--;
+        setValorContagemBloqueante(contagem);
+      }
     };
 
-    worker.addEventListener("message", handleMessage);
+    contagemRegressiva(num);
 
-    worker.postMessage({ valor1, valor2 });
+    let i = 0;
+    while (i < VALOR_CALCULO / 1.33) {
+      console.log(VALOR_CALCULO);
+      i++;
+    }
+
+    toast.error("Fim Processamento pesado Thread principal", {
+      hideProgressBar: true,
+    });
   };
 
   return (
     <div className="App">
+      <ToastContainer />
       <header className="App-header">
         <p>JavaScript Web Workers</p>
         <strong>Toy Problem - MDC</strong>
 
-        <p>Valor 1</p>
+        <div className="container-separator">
+          <p>Envie um valor para Contagem regressiva</p>
+          <Input type="text" onChange={handleValor3Change} />
+          <br></br>
 
-        <Input type="text" value={valor1} onChange={handleValor1Change} />
+          {contagem ? <p>Contagem regressiva {valorContagem}...</p> : null}
+        </div>
+        <Button onClick={naoBloqueante}>Pressione</Button>
 
-        <p>Valor 2</p>
-        <Input type="text" value={valor2} onChange={handleValor2Change} />
+        <div className="container-separator">
+          <p>Envie um valor para Contagem regressiva bloqueante</p>
+          <Input type="text" onChange={changeValorBloqueante} />
+          <br></br>
 
-        <br></br>
-        <Button onClick={handleBotaoClick}>Pressione</Button>
-
-        <p>{resultado}</p>
+          {contagemBloqueante ? (
+            <p>Contagem regressiva {valorContagemBloqueante}...</p>
+          ) : null}
+        </div>
+        <Button
+          onClick={() => {
+            toast.error("Iniciando Processamento pesado", {
+              hideProgressBar: true,
+            });
+            contagemBloqueanteFn(contagemBloqueante);
+          }}
+        >
+          Pressione
+        </Button>
       </header>
     </div>
   );
